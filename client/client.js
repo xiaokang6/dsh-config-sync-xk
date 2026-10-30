@@ -112,6 +112,11 @@ window.__ModuleLoader__.load({
       scopeLabel: '同步范围（只读）',
       scopeHint: '范围来自插件的 profile 配置，这里只做展示。',
       scopeEmpty: '没有同步文件',
+      autoSyncToggle: '启动时自动同步（DSH 打开约 15 秒后执行一次）',
+      autoSyncLabel: '启动自动同步',
+      autoSyncOn: '开',
+      autoSyncOff: '关',
+      autoSyncHint: '只在启动后自动同步一次；拉到新配置仍然只提示重启，不会自动重启 DSH。',
       save: '保存设置',
       discard: '撤销修改',
       saved: '已保存，下一次同步使用新设置。',
@@ -227,6 +232,11 @@ window.__ModuleLoader__.load({
       scopeLabel: 'Scope (read-only)',
       scopeHint: 'The scope comes from the plugin profile configuration and is shown here for reference.',
       scopeEmpty: 'No files',
+      autoSyncToggle: 'Sync on startup (about 15 seconds after DSH opens)',
+      autoSyncLabel: 'Sync on startup',
+      autoSyncOn: 'On',
+      autoSyncOff: 'Off',
+      autoSyncHint: 'Runs one sync shortly after startup; a pulled change still only marks a restart, DSH never restarts itself.',
       save: 'Save settings',
       discard: 'Discard',
       saved: 'Saved; the next sync uses the new settings.',
@@ -494,7 +504,7 @@ window.__ModuleLoader__.load({
      * Normalise the two configuration answer shapes: `GET /config` returns the
      * fields at the top level, `POST /config` nests them under `config`.
      * @param {any} payload - route answer.
-     * @returns {{remote: any, crypto: any, scope: string[], direction: string}}
+     * @returns {{remote: any, crypto: any, scope: string[], direction: string, autoSyncOnStart: boolean}}
      */
     function readConfig(payload) {
       const source = payload !== null && typeof payload === 'object' && payload.config !== null && typeof payload.config === 'object'
@@ -517,6 +527,8 @@ window.__ModuleLoader__.load({
         crypto: { enabled: crypto.enabled === true, hasPassphrase: crypto.hasPassphrase === true },
         scope: Array.isArray(source.scope) ? source.scope.filter((entry) => typeof entry === 'string') : [],
         direction: DIRECTION_IDS.includes(source.direction) ? source.direction : 'both',
+        // The host defaults this to on, so only an explicit `false` turns it off.
+        autoSyncOnStart: source.autoSyncOnStart !== false,
       }
     }
 
@@ -683,8 +695,8 @@ window.__ModuleLoader__.load({
       return null
     }
 
-    /** Top card: device, profile, remote, connectivity and last sync. */
-    function StatusCard({ status, loading, busy, t, onProbe, onRefresh }) {
+    /** Top card: device, profile, remote, connectivity, auto sync and last sync. */
+    function StatusCard({ status, autoSync, loading, busy, t, onProbe, onRefresh }) {
       const chips = []
       if (busy !== '') chips.push(h('span', { className: 'dcs-chip dcs-chip-warn', key: 'busy' }, t('running')))
       if (status !== null && status.pendingRestart === true) chips.push(h('span', { className: 'dcs-chip dcs-chip-warn', key: 'restart' }, t('pendingRestart')))
@@ -735,6 +747,14 @@ window.__ModuleLoader__.load({
             h('span', { className: lastSync.ok === true ? 'dcs-chip dcs-chip-ok' : 'dcs-chip dcs-chip-err' }, lastSync.ok === true ? t('syncOk') : t('syncFail')),
           )
 
+      // Read-only view of the switch the form owns; `null` means /config has
+      // not loaded yet (or failed), so the value is unknown rather than off.
+      const autoSyncNode = autoSync === true
+        ? h('span', { className: 'dcs-chip dcs-chip-ok' }, t('autoSyncOn'))
+        : autoSync === false
+          ? h('span', { className: 'dcs-chip' }, t('autoSyncOff'))
+          : h('span', { className: 'dcs-hint' }, '—')
+
       const cell = (key, label, node) => h('div', { key }, h('dt', null, label), h('dd', null, node))
 
       return h('section', { className: 'dcs-card' },
@@ -751,6 +771,7 @@ window.__ModuleLoader__.load({
           cell('root', t('remoteRoot'), h('span', { className: 'dcs-mono' }, textOf(remote.root, '—'))),
           cell('probe', t('probe'), probeNode),
           cell('lastSync', t('lastSync'), lastSyncNode),
+          cell('autoSync', t('autoSyncLabel'), autoSyncNode),
         ),
       )
     }
@@ -769,6 +790,7 @@ window.__ModuleLoader__.load({
         path: remote.path === '' ? DEFAULT_PATH : remote.path,
         cryptoEnabled: config.crypto.enabled,
         direction: config.direction,
+        autoSyncOnStart: config.autoSyncOnStart,
       }
       const value = (field) => (draft[field] === undefined ? stored[field] : draft[field])
       const set = (field, next) => setDraft((previous) => ({ ...previous, [field]: next }))
@@ -870,6 +892,21 @@ window.__ModuleLoader__.load({
         }, DIRECTIONS.map((entry) => h('option', { key: entry.id, value: entry.id }, t(entry.labelKey)))),
       )
 
+      // Boot-time sync lives in remote.json too, so it saves with the rest of
+      // the form; the status card mirrors the stored value read-only.
+      const autoSyncField = h('div', { className: 'dcs-field', key: 'autoSync' },
+        h('label', { className: 'dcs-check' },
+          h('input', {
+            type: 'checkbox',
+            checked: value('autoSyncOnStart') === true,
+            disabled,
+            onChange: (event) => set('autoSyncOnStart', event.target.checked),
+          }),
+          h('span', { className: 'dcs-label' }, t('autoSyncToggle')),
+        ),
+        h('p', { className: 'dcs-hint' }, t('autoSyncHint')),
+      )
+
       const scopeField = h('div', { className: 'dcs-field', key: 'scope' },
         h('span', { className: 'dcs-label' }, t('scopeLabel')),
         h('span', { className: 'dcs-scope' }, config.scope.length === 0
@@ -915,6 +952,7 @@ window.__ModuleLoader__.load({
             crypto: cryptoPayload,
             scope: config.scope.slice(),
             direction: value('direction'),
+            autoSyncOnStart: value('autoSyncOnStart') === true,
           })
           if (accepted === true) setDraft({})
         })()
@@ -925,6 +963,7 @@ window.__ModuleLoader__.load({
         kindHead,
         kindBody,
         h('div', { className: 'dcs-row' }, cryptoField, directionField),
+        autoSyncField,
         scopeField,
         h('div', { className: 'dcs-actions' },
           h('button', {
@@ -1325,6 +1364,7 @@ window.__ModuleLoader__.load({
       children.push(h(StatusCard, {
         key: 'status',
         status,
+        autoSync: config === null ? null : config.autoSyncOnStart,
         loading,
         busy,
         t,

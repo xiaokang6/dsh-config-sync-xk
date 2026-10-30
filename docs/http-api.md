@@ -62,7 +62,7 @@ Every **POST** route runs the same-origin guard before doing anything:
               "owner": "", "repo": "", "branch": "main",
               "hasPassword": true, "hasToken": false },
   "crypto": { "enabled": false, "hasPassphrase": false },
-  "scope": [...], "direction": "both" }
+  "scope": [...], "direction": "both", "autoSyncOnStart": true }
 ```
 
 ### `POST /dsh-config-sync/config`
@@ -71,7 +71,7 @@ Every **POST** route runs the same-origin guard before doing anything:
 { "remote": { "kind": "webdav", "baseUrl": "…", "username": "…", "password": "…", "path": "…" },
   "crypto": { "enabled": false, "passphrase": "" },
   "scope": ["package.json", "cordis.patch.yml", "cordis.yml", "pnpm-lock.yaml"],
-  "direction": "both" }
+  "direction": "both", "autoSyncOnStart": true }
 ```
 
 Empty/missing secret fields keep the stored value; `password: ""` clears it.
