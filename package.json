@@ -1,0 +1,65 @@
+{
+  "name": "dsh-config-sync",
+  "version": "0.1.0",
+  "description": "Sync a DeepSeek Harness profile's configuration across devices through Nutstore WebDAV or GitHub, with hash-based conflict detection, optional AES-256-GCM encryption, and a settings-page UI.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./client/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client",
+    "cordis.patch.yml",
+    "docs",
+    "scripts",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "install:desktop": "node scripts/install.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "config-sync",
+    "webdav",
+    "nutstore",
+    "jianguoyun",
+    "github"
+  ],
+  "license": "MIT",
+  "author": "xiaokang6",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaokang6/dsh-config-sync.git"
+  },
+  "homepage": "https://github.com/xiaokang6/dsh-config-sync#readme",
+  "bugs": {
+    "url": "https://github.com/xiaokang6/dsh-config-sync/issues"
+  }
+}

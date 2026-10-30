@@ -1,0 +1,19 @@
+# dsh-config-sync — bundle patch: mount the host half.
+#
+# The row is host-plane: it registers the plugin's sync service and its
+# `/dsh-config-sync/*` HTTP routes on the host `webServer` seam. All remote
+# credentials live in a local-only file (`$DSH_HOME/config-sync/remote.json`),
+# never in this document — this file is itself one of the synced files.
+#
+# Defaults can be overridden from the user's own patch layer, keyed by the row
+# id `config-sync`, e.g.:
+#
+#   - id: config-sync
+#     config:
+#       direction: both
+#       scope: [package.json, cordis.patch.yml, cordis.yml, pnpm-lock.yaml]
+#       crypto: { enabled: false }
+
+- insert:
+    - id: config-sync
+      name: dsh-config-sync
