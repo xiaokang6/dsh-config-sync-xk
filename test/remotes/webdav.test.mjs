@@ -222,6 +222,54 @@ test('write with a stale etag throws RemoteConflictError', async () => {
   assert.equal((await remote.read('conflict.txt')).bytes.toString('utf8'), 'b')
 })
 
+test('坚果云 bare ETags: If-Match goes out verbatim, so a conditional write is not 412', async (t) => {
+  // 坚果云 keeps its ETag unquoted and compares If-Match byte-for-byte, so a
+  // client that adds the RFC 7232 quotes can never satisfy the precondition:
+  // every update of an existing file failed with 412.
+  const nutstore = await createMockWebdav({ bareEtags: true })
+  t.after(async () => {
+    await nutstore.close()
+  })
+  const adapter = createRemote({
+    kind: 'webdav',
+    baseUrl: nutstore.url,
+    username: nutstore.username,
+    password: nutstore.password,
+    path: ROOT,
+  })
+
+  await adapter.write('files/package.json', Buffer.from('one'))
+  const first = await adapter.read('files/package.json')
+  assert.equal(first.found, true)
+  assert.equal(typeof first.etag, 'string')
+  assert.ok(!String(first.etag).includes('"'), '坚果云 exposes a bare ETag')
+
+  // The plan hands the stored etag back on the next write, as the engine does.
+  await adapter.write('files/package.json', Buffer.from('two'), { etag: first.etag })
+  const put = nutstore.requests.filter((request) => request.method === 'PUT').at(-1)
+  assert.equal(put.headers['if-match'], first.etag, 'If-Match must not be re-quoted')
+  assert.equal((await adapter.read('files/package.json')).bytes.toString('utf8'), 'two')
+
+  // A conditional delete takes the same path.
+  const second = await adapter.read('files/package.json')
+  await adapter.remove('files/package.json', { etag: second.etag })
+  assert.equal((await adapter.read('files/package.json')).found, false)
+
+  // The precondition is still enforced: a stale validator conflicts, never overwrites.
+  await adapter.write('files/package.json', Buffer.from('three'))
+  await adapter.write('files/package.json', Buffer.from('four'))
+  await assert.rejects(
+    () => adapter.write('files/package.json', Buffer.from('five'), { etag: second.etag }),
+    (error) => {
+      assert.ok(error instanceof RemoteConflictError)
+      assert.equal(error.status, 412)
+      assert.match(error.message, CJK)
+      return true
+    },
+  )
+  assert.equal((await adapter.read('files/package.json')).bytes.toString('utf8'), 'four')
+})
+
 test('list returns direct children only, with type, size and etag', async () => {
   await remote.write('manifest.json', Buffer.from('{}'))
   await remote.write('files/cordis.patch.yml', Buffer.from('x'))
