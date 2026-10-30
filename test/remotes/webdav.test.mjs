@@ -17,6 +17,9 @@ import { createMockWebdav } from '../../lib/sync/remotes/mock/webdav-server.js'
 const ROOT = 'dsh-config-sync/desktop'
 const CJK = /[\u4e00-\u9fff]/
 const SECRET_PASSWORD = 'hunter2-secret'
+/** Documented probe detail when the remote root does not exist yet. */
+const ROOT_MISSING_DETAIL =
+  '远端根目录尚不存在（首次同步会自动创建） / remote root does not exist yet (first sync will create it)'
 
 /** @type {Awaited<ReturnType<typeof createMockWebdav>>} */
 let server
@@ -83,9 +86,68 @@ test('probe reports ok on a reachable DAV root', async () => {
 test('probe reports ok:false (not a throw) when the remote root is missing', async () => {
   const result = await remote.probe()
   assert.equal(result.ok, false)
+  assert.equal(result.detail, ROOT_MISSING_DETAIL)
   assert.match(result.detail, CJK)
   assert.match(result.detail, /root/i)
   assert.ok(!result.detail.includes(server.password))
+})
+
+test('treats 坚果云 409 AncestorsNotFound as "missing" for probe/read/list/remove and still writes through it', async (t) => {
+  // Emulate 坚果云/SabreDAV: a deep path whose ancestors are missing answers
+  // 409 + AncestorsNotFound XML instead of 404.
+  const nutstore = await createMockWebdav({ ancestorsNotFound: true })
+  t.after(async () => {
+    await nutstore.close()
+  })
+  const adapter = createRemote({
+    kind: 'webdav',
+    baseUrl: nutstore.url,
+    username: nutstore.username,
+    password: nutstore.password,
+    path: ROOT,
+  })
+
+  // Configured root directory does not exist yet (path like dsh-config-sync/desktop).
+  const probed = await adapter.probe()
+  assert.equal(probed.ok, false, 'a missing root is not an error for probe()')
+  assert.equal(probed.detail, ROOT_MISSING_DETAIL)
+
+  assert.deepEqual(await adapter.read('manifest.json'), { found: false })
+  assert.deepEqual(await adapter.read('files/package.json'), { found: false })
+  assert.deepEqual(await adapter.list(''), [])
+  assert.deepEqual(await adapter.list('files'), [])
+  await adapter.remove('files/never.txt') // a missing path is a no-op, even as 409
+
+  // write() must MKCOL every missing ancestor, including the configured root prefix.
+  const written = await adapter.write('files/manifest.json', Buffer.from('{"schema":1}'))
+  assert.equal(typeof written.etag, 'string')
+  assert.ok(nutstore.dirs.has('dsh-config-sync'), 'the first root segment must be created')
+  assert.ok(nutstore.dirs.has(ROOT), 'the configured root prefix must be created')
+  assert.ok(nutstore.dirs.has(`${ROOT}/files`), 'the payload parent directory must be created')
+  assert.ok(nutstore.files.has(`${ROOT}/files/manifest.json`))
+
+  // Once the root exists, the 409s are gone.
+  assert.equal((await adapter.probe()).ok, true)
+  const roundtrip = await adapter.read('files/manifest.json')
+  assert.equal(roundtrip.found, true)
+  assert.equal(roundtrip.bytes.toString('utf8'), '{"schema":1}')
+  assert.deepEqual((await adapter.list('')).map((entry) => [entry.path, entry.isDir]), [['files', true]])
+
+  // Any other 409 (lock conflict) keeps its error semantics.
+  nutstore.injectFailure({ status: 409, body: 'LockConflict: the resource is locked' })
+  await assert.rejects(
+    () => adapter.read('files/manifest.json'),
+    (error) => {
+      assert.ok(error instanceof RemoteError)
+      assert.equal(error.status, 409)
+      assert.match(error.message, CJK)
+      return true
+    },
+  )
+  nutstore.injectFailure({ status: 409, body: 'LockConflict: the resource is locked' })
+  await assert.rejects(() => adapter.list('files'), (error) => error instanceof RemoteError && error.status === 409)
+  nutstore.injectFailure({ status: 409, body: 'LockConflict: the resource is locked' })
+  await assert.rejects(() => adapter.remove('files/manifest.json'), (error) => error instanceof RemoteError && error.status === 409)
 })
 
 test('probe throws RemoteAuthError for a wrong password', async () => {

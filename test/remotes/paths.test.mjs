@@ -13,7 +13,7 @@ import {
   RemoteUnavailableError,
   createRemote,
 } from '../../lib/sync/remotes/index.js'
-import { parseDavMultistatus } from '../../lib/sync/remotes/webdav.js'
+import { isMissingDavResponse, parseDavMultistatus } from '../../lib/sync/remotes/webdav.js'
 import {
   DEFAULT_TIMEOUT_MS,
   basicAuth,
@@ -370,4 +370,31 @@ test('parseDavMultistatus handles absolute URLs, entities and garbage', () => {
   assert.equal(entry.size, 0)
   assert.deepEqual(parseDavMultistatus(''), [])
   assert.deepEqual(parseDavMultistatus('<html>not dav</html>'), [])
+})
+
+// ---------------------------------------------------------------------------
+// 坚果云 409 AncestorsNotFound classification
+// ---------------------------------------------------------------------------
+
+test('isMissingDavResponse treats 404/410 and 坚果云 409 AncestorsNotFound as "missing"', () => {
+  // Real absences.
+  assert.equal(isMissingDavResponse(404, ''), true)
+  assert.equal(isMissingDavResponse(410, 'gone'), true)
+  // 坚果云 answers 409 for a deep path whose ancestors do not exist yet.
+  assert.equal(
+    isMissingDavResponse(
+      409,
+      '<?xml version="1.0"?><d:error><s:message>AncestorsNotFound: The ancestors of this location do not exist.</s:message></d:error>',
+    ),
+    true,
+  )
+  assert.equal(isMissingDavResponse(409, 'Not Found'), true)
+  assert.equal(isMissingDavResponse(409, 'no such collection'), true)
+  // Any other 409 (lock conflict, …) must stay an error.
+  assert.equal(isMissingDavResponse(409, 'LockConflict: the resource is locked'), false)
+  assert.equal(isMissingDavResponse(409, ''), false)
+  assert.equal(isMissingDavResponse(409, undefined), false)
+  // Only 404/410/409 can mean "missing".
+  assert.equal(isMissingDavResponse(401, 'AncestorsNotFound'), false)
+  assert.equal(isMissingDavResponse(500, 'not found'), false)
 })
