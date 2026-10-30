@@ -153,6 +153,7 @@ pnpm update dsh-config-sync
 | 远端数据已加密但本机没口令 | 打开加密并录入相同口令，再同步 |
 | 拉取被拒（零依赖） | 确认远端 `package.json` 是否来自坏备份；必要时在设置里临时允许空依赖，或先修远端 |
 | 冲突文件堆积 | 在设置页逐个「采用远端 / 采用本地」，处理后会删除 `.remote-*` 副本 |
+| 拉取后 `pnpm install` 报 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` | 另一台设备装的包在宿主「新版本等待期」内（默认 24h），本机复现同一份 lockfile 时被策略拦下。新版会自动用 `minimumReleaseAge=0` 重试一次并在报告里标 `policyRelaxed: true`；也可以手动 `pnpm install --config.minimumReleaseAge=0` |
 | 上传已有文件报 412 `ETag doesn't match` | 坚果云返回的 ETag 不带引号、且按字符串原文比较 `If-Match`；旧版给它补了 RFC 的引号，于是每个已存在的文件都写不进去。新版原样透传（`lib/sync/remotes/webdav.js` 的 `ifMatchValue`），更新后重启即好 |
 | 同步到另一台机器后插件不见了 / `pnpm install` 报链接目标不存在 | `package.json` 里是 `link:D:/…` 这种本机绝对路径，跟着配置同步过去就失效。改用 `github:xiaokang6/dsh-config-sync`（不带路径，多机通用）；`dsh-pentest-gate` 之类同样用 `link:` 的插件有同一问题 |
 | 设置页保存时返回 401 / 请求被拒 | 旧版本守卫在桌面端也会调用宿主鉴权；新版已改为桌面端跳过（桌面代理自己负责鉴权），重启宿主后生效 |
