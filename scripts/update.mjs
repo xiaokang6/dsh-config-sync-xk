@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * One-command upgrade for dsh-config-sync, whatever form it was installed in.
+ * One-command upgrade for @xiaokang6/dsh-config-sync, whatever form it was
+ * installed in.
  *
  *   npm run update          # upgrade, then tell you how to reload the host
  *   npm run update:check    # report only: nothing is changed
@@ -14,9 +15,13 @@
  *   symlink is imported from its real path, where the host's own packages are
  *   not on the resolution path.
  * - `github:` / git URL — the plugin is a snapshot inside the profile, pinning a
- *   commit in `pnpm-lock.yaml`. Upgrade = `pnpm update dsh-config-sync`, which
+ *   commit in `pnpm-lock.yaml`. Upgrade = `pnpm update <dependency key>`, which
  *   re-resolves the ref; no checkout, no local path, nothing to remember. This is
  *   the form to use on every machine that is not actively developing the plugin.
+ *
+ * The dependency key is read from the profile rather than assumed: profiles
+ * installed before the package moved under the `@xiaokang6` scope carry the old
+ * unscoped key, and pnpm matches by that key.
  *
  * Local edits are never dropped: in link mode a dirty tree is stashed before the
  * fast-forward and restored after it, and a failed restore is reported without
@@ -31,7 +36,12 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-const PACKAGE_NAME = 'dsh-config-sync'
+/** The package this script upgrades. */
+const PACKAGE_NAME = '@xiaokang6/dsh-config-sync'
+/** Its name before the scope move; old profiles still key the dependency by it. */
+const LEGACY_PACKAGE_NAME = 'dsh-config-sync'
+/** Dependency keys this plugin answers to, current name first. */
+const PACKAGE_NAMES = [PACKAGE_NAME, LEGACY_PACKAGE_NAME]
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoDir = path.resolve(here, '..')
@@ -108,8 +118,10 @@ function profilePnpmInstall() {
 }
 
 /** Upgrade the profile's copy in place (git/registry install forms). */
-function profilePnpmUpdate() {
-  const result = shell(`pnpm update ${PACKAGE_NAME}`, { cwd: profileDir, stdio: 'inherit' })
+function profilePnpmUpdate(dependencyName) {
+  // The key pnpm knows: `dependencies` holds the installed name, which on a
+  // pre-scope profile is the legacy one.
+  const result = shell(`pnpm update ${dependencyName}`, { cwd: profileDir, stdio: 'inherit' })
   return result.ok
 }
 
@@ -156,10 +168,12 @@ function reloadHint() {
 const manifestPath = path.join(profileDir, 'package.json')
 if (!fs.existsSync(manifestPath)) fail(`profile not found: ${profileDir} (pass --profile-dir <dir>)`)
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-const spec = manifest?.dependencies?.[PACKAGE_NAME]
-if (typeof spec !== 'string') {
+/** The key the dependency is actually stored under in this profile. */
+const dependencyName = PACKAGE_NAMES.find((name) => typeof manifest?.dependencies?.[name] === 'string')
+if (dependencyName === undefined) {
   fail(`${PACKAGE_NAME} is not a dependency of ${profileDir} — install it first (node scripts/install.mjs, or a "github:" dependency)`)
 }
+const spec = manifest.dependencies[dependencyName]
 
 const linkMode = spec.startsWith('link:')
 const gitInstall = /^(?:github:|git\+|https?:\/\/)/u.test(spec)
@@ -173,8 +187,8 @@ log(`install: ${linkMode ? `link: → ${spec.slice(5)}` : `${spec} (snapshot ins
 if (!linkMode) {
   if (!gitInstall) {
     log('\n⚠ the dependency is a registry version. The npm package named')
-    log(`  "${PACKAGE_NAME}" belongs to a different project, so this is almost`)
-    log('  certainly not the plugin you want — use "github:xiaokang6/dsh-config-sync".')
+    log(`  "${LEGACY_PACKAGE_NAME}" belongs to a different project, so this is almost`)
+    log('  certainly not the plugin you want — use "github:xiaokang6/dsh-config-sync-xk".')
   }
   const pinned = remote === undefined ? undefined : lockedCommit(remote.owner, remote.repo)
   const latest = remote === undefined ? undefined : remoteCommit(remote)
@@ -192,11 +206,11 @@ if (!linkMode) {
     reloadHint()
     process.exit(0)
   } else if (checkOnly) {
-    log('\n--check: an update is available — run "npm run update" (or "pnpm update dsh-config-sync" in the profile).')
+    log(`\n--check: an update is available — run "npm run update" (or "pnpm update ${dependencyName}" in the profile).`)
     process.exit(0)
   }
   log('\n• updating the profile copy (pnpm update)')
-  if (!profilePnpmUpdate()) fail(`pnpm update ${PACKAGE_NAME} failed in ${profileDir}`)
+  if (!profilePnpmUpdate(dependencyName)) fail(`pnpm update ${dependencyName} failed in ${profileDir}`)
   const updated = remote === undefined ? undefined : lockedCommit(remote.owner, remote.repo)
   log(
     updated === undefined

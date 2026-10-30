@@ -84,7 +84,7 @@ test('probe reports ok and sends the contract headers', async () => {
   assert.equal(request.headers.authorization, `Bearer ${server.token}`)
   assert.equal(request.headers.accept, 'application/vnd.github+json')
   assert.equal(request.headers['x-github-api-version'], '2022-11-28')
-  assert.equal(request.headers['user-agent'], 'dsh-config-sync/0.1.0')
+  assert.equal(request.headers['user-agent'], '@xiaokang6/dsh-config-sync/0.1.0')
 })
 
 test('probe without a token throws RemoteAuthError', async () => {

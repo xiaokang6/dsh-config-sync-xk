@@ -161,7 +161,7 @@ decides the form, so the panel need not know how the user installed it:
   "ok": true,
   "update": {
     "form": "git",                  // "git" | "link" | "registry"
-    "spec": "github:xiaokang6/dsh-config-sync",
+    "spec": "github:xiaokang6/dsh-config-sync-xk",
     "canApply": true,
     "pinned": "aeeb63c",            // commit in pnpm-lock.yaml (git form)
     "latest": "49b444a",            // refs/heads/<ref> on GitHub
@@ -191,7 +191,7 @@ dirty, because a web route must not move someone's work aside.
 Guarded (same-origin + host gate, like every mutating route). Upgrades the
 installed copy and reports what moved:
 
-- `git` form — `pnpm update dsh-config-sync` in the profile; the pin moving is
+- `git` form — `pnpm update @xiaokang6/dsh-config-sync` in the profile (by the key the profile actually carries — an install made under the pre-scope name `dsh-config-sync` is upgraded through that key); the pin moving is
   the proof, `restartRequired` follows it.
 - `link` form — `git merge --ff-only @{upstream}` in the checkout; refused with
   `ran: false` when tracked edits are uncommitted.

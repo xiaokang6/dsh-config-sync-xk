@@ -1,5 +1,5 @@
 @echo off
-rem One-click upgrade for dsh-config-sync, whichever way it was installed.
+rem One-click upgrade for @xiaokang6/dsh-config-sync, whichever way it was installed.
 rem The script reads the profile's dependency spec: link: pulls this checkout,
 rem github: runs "pnpm update" in the profile.
 rem Afterwards press the refresh button at the top right of DeepSeek Harness

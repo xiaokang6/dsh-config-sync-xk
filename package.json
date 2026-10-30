@@ -1,5 +1,5 @@
 {
-  "name": "dsh-config-sync",
+  "name": "@xiaokang6/dsh-config-sync",
   "version": "0.1.0",
   "description": "Sync a DeepSeek Harness profile's configuration across devices through Nutstore WebDAV or GitHub, with hash-based conflict detection, optional AES-256-GCM encryption, and a settings-page UI.",
   "type": "module",
@@ -58,10 +58,10 @@
   "author": "xiaokang6",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xiaokang6/dsh-config-sync.git"
+    "url": "git+https://github.com/xiaokang6/dsh-config-sync-xk.git"
   },
-  "homepage": "https://github.com/xiaokang6/dsh-config-sync#readme",
+  "homepage": "https://github.com/xiaokang6/dsh-config-sync-xk#readme",
   "bugs": {
-    "url": "https://github.com/xiaokang6/dsh-config-sync/issues"
+    "url": "https://github.com/xiaokang6/dsh-config-sync-xk/issues"
   }
 }

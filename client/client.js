@@ -1,5 +1,5 @@
 /**
- * dsh-config-sync — browser half.
+ * @xiaokang6/dsh-config-sync — browser half.
  *
  * A hand-written client bundle in the shell's lazy-CJS format: the module
  * system registers this factory through `window.__ModuleLoader__.load`, and the
@@ -15,11 +15,11 @@
  * answers carry `hasPassword` / `hasToken` flags instead, and an empty secret
  * field keeps the stored value.
  *
- * @module dsh-config-sync/client
+ * @module @xiaokang6/dsh-config-sync/client
  */
 
 window.__ModuleLoader__.load({
-  id: 'dsh-config-sync',
+  id: '@xiaokang6/dsh-config-sync',
   factory: (require) => {
     var module = { exports: {} }
     var exports = module.exports
@@ -174,7 +174,7 @@ window.__ModuleLoader__.load({
       logsEmpty: '暂无日志。',
       syncDone: '同步完成。',
       updateTitle: '插件升级',
-      updateIntro: '升级本机 profile 里的 dsh-config-sync 版本。完成后需要点窗口右上角的刷新按钮（或重启 App）才会用上新代码。',
+      updateIntro: '升级本机 profile 里的 @xiaokang6/dsh-config-sync 版本。完成后需要点窗口右上角的刷新按钮（或重启 App）才会用上新代码。',
       updateCheck: '检查更新',
       updateApply: '一键升级',
       updateRunning: '升级中…',
@@ -188,7 +188,7 @@ window.__ModuleLoader__.load({
       updateDone: '升级完成',
       updateCurrent: '已是最新，无需升级。',
       updateReload: '请点窗口右上角的刷新按钮（或重启 App）让新代码生效。',
-      updateConfirm: '现在升级本机 profile 里的 dsh-config-sync？升级会改 package.json / pnpm-lock.yaml，并自动跑 pnpm。',
+      updateConfirm: '现在升级本机 profile 里的 @xiaokang6/dsh-config-sync？升级会改 package.json / pnpm-lock.yaml，并自动跑 pnpm。',
       errUpdate: '升级失败',
     }
 
@@ -311,7 +311,7 @@ window.__ModuleLoader__.load({
       logsEmpty: 'No log entries.',
       syncDone: 'Sync finished.',
       updateTitle: 'Upgrade plugin',
-      updateIntro: 'Upgrade the dsh-config-sync installed in this profile. The new code only takes effect after the refresh button at the top right (or a restart).',
+      updateIntro: 'Upgrade the @xiaokang6/dsh-config-sync installed in this profile. The new code only takes effect after the refresh button at the top right (or a restart).',
       updateCheck: 'Check for updates',
       updateApply: 'Upgrade now',
       updateRunning: 'Upgrading…',
@@ -325,7 +325,7 @@ window.__ModuleLoader__.load({
       updateDone: 'Upgraded',
       updateCurrent: 'Already up to date.',
       updateReload: 'Press the refresh button at the top right (or restart the app) so the new code takes effect.',
-      updateConfirm: 'Upgrade the dsh-config-sync installed in this profile? This rewrites package.json / pnpm-lock.yaml and runs pnpm.',
+      updateConfirm: 'Upgrade the @xiaokang6/dsh-config-sync installed in this profile? This rewrites package.json / pnpm-lock.yaml and runs pnpm.',
       errUpdate: 'Upgrade failed',
     }
 
@@ -407,10 +407,12 @@ window.__ModuleLoader__.load({
       '.dcs-scope{display:flex;flex-wrap:wrap;gap:6px}',
     ].join('')
 
-    const CSS_TAG = 'dsh-config-sync/panel.css'
+    // `data-plugin` must be this module's registered id: the module system tears
+    // a bundle's styles down by that exact attribute value when it unloads.
+    const CSS_TAG = '@xiaokang6/dsh-config-sync/panel.css'
     if (typeof document !== 'undefined' && document.querySelector(`style[data-plugin-css=${JSON.stringify(CSS_TAG)}]`) === null) {
       const tag = document.createElement('style')
-      tag.dataset.plugin = 'dsh-config-sync'
+      tag.dataset.plugin = '@xiaokang6/dsh-config-sync'
       tag.dataset.pluginCss = CSS_TAG
       tag.textContent = CSS
       document.head.appendChild(tag)
@@ -1607,7 +1609,7 @@ window.__ModuleLoader__.load({
       }, (props) => h(PluginsItem, { ...props, ...face() })))
     }
 
-    exports.name = 'dsh-config-sync'
+    exports.name = '@xiaokang6/dsh-config-sync'
     exports.inject = inject
     exports.apply = apply
     // Exposed for tooling and the smoke test; the host never reads it.

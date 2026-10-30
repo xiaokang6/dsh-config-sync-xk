@@ -1,4 +1,4 @@
-# dsh-config-sync — design
+# @xiaokang6/dsh-config-sync — design
 
 Goals: keep one DSH profile's configuration identical across devices, through
 坚果云 (Nutstore) WebDAV or GitHub, with no data loss and no surprises.

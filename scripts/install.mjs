@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Add dsh-config-sync to a DSH profile: a `link:` dependency plus the bundle row.
+ * Add @xiaokang6/dsh-config-sync to a DSH profile: a `link:` dependency plus
+ * the bundle row.
  *
  * Usage:
  *   node scripts/install.mjs [--profile <name>] [--profile-dir <dir>] [--dry-run] [--install]
@@ -9,12 +10,21 @@
  * $DSH_HOME/profiles/<profile>, then ~/.dsh/profiles/desktop. The script never
  * edits cordis.patch.yml: the plugin's own bundle patch mounts the host half,
  * and its settings live in the settings page.
+ *
+ * A profile installed before the package moved under the `@xiaokang6` scope has
+ * the dependency and the bundle entry under the old unscoped name. Both are the
+ * same plugin, so the legacy dependency key and bundle entry are removed here:
+ * leaving them behind would either install the plugin twice or leave the host
+ * resolving a name that is no longer installed.
  */
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+
+/** The name this plugin used before the scope move. */
+const LEGACY_PACKAGE_NAME = 'dsh-config-sync'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const packageDir = path.resolve(here, '..')
@@ -44,10 +54,15 @@ const profile = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
 const spec = `link:${packageDir.replaceAll('\\', '/')}`
 
 profile.dependencies ??= {}
+// The old unscoped key names the same plugin: drop it instead of installing twice.
+if (manifest.name !== LEGACY_PACKAGE_NAME) delete profile.dependencies[LEGACY_PACKAGE_NAME]
 profile.dependencies[manifest.name] = spec
 profile.dsh ??= {}
 profile.dsh.profile ??= {}
 profile.dsh.profile.bundles ??= []
+if (manifest.name !== LEGACY_PACKAGE_NAME) {
+  profile.dsh.profile.bundles = profile.dsh.profile.bundles.filter((name) => name !== LEGACY_PACKAGE_NAME)
+}
 if (!profile.dsh.profile.bundles.includes(manifest.name)) {
   profile.dsh.profile.bundles.push(manifest.name)
 }

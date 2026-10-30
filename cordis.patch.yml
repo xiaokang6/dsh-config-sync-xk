@@ -1,4 +1,4 @@
-# dsh-config-sync — bundle patch: mount the host half.
+# @xiaokang6/dsh-config-sync — bundle patch: mount the host half.
 #
 # The row is host-plane: it registers the plugin's sync service and its
 # `/dsh-config-sync/*` HTTP routes on the host `webServer` seam. All remote
@@ -16,4 +16,4 @@
 
 - insert:
     - id: config-sync
-      name: dsh-config-sync
+      name: "@xiaokang6/dsh-config-sync"

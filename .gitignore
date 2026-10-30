@@ -2,3 +2,4 @@ node_modules/
 .recon/
 *.log
 .DS_Store
+.git-commit-msg.txt

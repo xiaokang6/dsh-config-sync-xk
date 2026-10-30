@@ -1,4 +1,4 @@
-# dsh-config-sync
+# @xiaokang6/dsh-config-sync
 
 把一台 DSH（DeepSeek Harness）的**配置**同步到多台设备：坚果云 WebDAV 或 GitHub，
 逐文件内容哈希判断变更，冲突时两份都保留，可选口令加密，全部操作在设置页完成。
@@ -42,13 +42,13 @@ pnpm install
 ### 其他机器：`github:` 快照（不需要克隆，也不依赖路径）
 
 ```powershell
-# 推荐：宿主自带的插件管理，会同时把 dsh-config-sync 加进 dsh.profile.bundles
-dsh plugin --profile desktop add github:xiaokang6/dsh-config-sync
+# 推荐：宿主自带的插件管理，会同时把 @xiaokang6/dsh-config-sync 加进 dsh.profile.bundles
+dsh plugin --profile desktop add github:xiaokang6/dsh-config-sync-xk
 
 # 没有 dsh 命令时用 pnpm —— 但必须自己把 bundle 行补上，否则插件不会挂载
 cd $env:USERPROFILE\.dsh\profiles\desktop
-pnpm add github:xiaokang6/dsh-config-sync
-# 然后把 "dsh-config-sync" 加进 package.json 的 dsh.profile.bundles
+pnpm add github:xiaokang6/dsh-config-sync-xk
+# 然后把 "@xiaokang6/dsh-config-sync" 加进 package.json 的 dsh.profile.bundles
 ```
 
 多机同步时**推荐这个写法**：`link:` 写的是本机绝对路径，会跟着 `package.json` 一起同步到别的
@@ -82,7 +82,7 @@ pnpm add github:xiaokang6/dsh-config-sync
 
 - **检查更新**：读 profile 里的依赖写法（`github:` / `link:` / registry），把锁文件里的提交与
   GitHub 上的分支头比一下，直接告你「已是最新」还是「有新版本」；
-- **一键升级**：`github:` 安装在 profile 里跑 `pnpm update dsh-config-sync`，`link:` 安装对那份
+- **一键升级**：`github:` 安装在 profile 里跑 `pnpm update @xiaokang6/dsh-config-sync`，`link:` 安装对那份
   检出做 fast-forward（有未提交改动会拒绝、不动你的工作区）；做完提示你点刷新按钮。
 
 「检查更新」的取数顺序和插件市场同一套思路——**先走 HTTPS，最后才碰 `git`**：
@@ -110,13 +110,13 @@ npm run update:check    # 只看有没有新版本，什么都不改
 
 脚本与面板按钮走同一套判断：`link:` 就拉本仓库（本地未提交改动先 stash、更新后还原，只有
 `package.json` / `pnpm-lock.yaml` 变了才跑 `pnpm install`，并补上 `link:` 导入需要的
-`@deepseek-ai/*` peer 链接）；`github:` 就 `pnpm update dsh-config-sync` 并报告新 pin。
+`@deepseek-ai/*` peer 链接）；`github:` 就 `pnpm update @xiaokang6/dsh-config-sync` 并报告新 pin。
 
 没有克隆的机器想从命令行升级，直接在 profile 里跑：
 
 ```powershell
 cd $env:USERPROFILE\.dsh\profiles\desktop
-pnpm update dsh-config-sync
+pnpm update @xiaokang6/dsh-config-sync
 ```
 
 
@@ -188,21 +188,21 @@ pnpm update dsh-config-sync
 
 | 现象 | 处理 |
 | --- | --- |
-| 设置页显示 404 | 宿主半没加载：确认 `package.json` 的 bundles 里有 `dsh-config-sync`，并触发一次热重组或重启 |
+| 设置页显示 404 | 宿主半没加载：确认 `package.json` 的 bundles 里有 `@xiaokang6/dsh-config-sync`，并触发一次热重组或重启 |
 | `pnpm install` 失败 | 看结果里的输出尾部；在 profile 目录手动跑 `pnpm install`，或检查 `pnpm` 是否在 PATH |
 | 远端数据已加密但本机没口令 | 打开加密并录入相同口令，再同步 |
 | 拉取被拒（零依赖） | 确认远端 `package.json` 是否来自坏备份；必要时在设置里临时允许空依赖，或先修远端 |
 | 冲突文件堆积 | 在设置页逐个「采用远端 / 采用本地」，处理后会删除 `.remote-*` 副本 |
 | 拉取后 `pnpm install` 报 `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` | 另一台设备装的包在宿主「新版本等待期」内（默认 24h），本机复现同一份 lockfile 时被策略拦下。新版会自动用 `minimumReleaseAge=0` 重试一次并在报告里标 `policyRelaxed: true`；也可以手动 `pnpm install --config.minimumReleaseAge=0` |
 | 上传已有文件报 412 `ETag doesn't match` | 坚果云返回的 ETag 不带引号、且按字符串原文比较 `If-Match`；旧版给它补了 RFC 的引号，于是每个已存在的文件都写不进去。新版原样透传（`lib/sync/remotes/webdav.js` 的 `ifMatchValue`），更新后重启即好 |
-| 同步到另一台机器后插件不见了 / `pnpm install` 报链接目标不存在 | `package.json` 里是 `link:D:/…` 这种本机绝对路径，跟着配置同步过去就失效。改用 `github:xiaokang6/dsh-config-sync`（不带路径，多机通用）；`dsh-pentest-gate` 之类同样用 `link:` 的插件有同一问题 |
+| 同步到另一台机器后插件不见了 / `pnpm install` 报链接目标不存在 | `package.json` 里是 `link:D:/…` 这种本机绝对路径，跟着配置同步过去就失效。改用 `github:xiaokang6/dsh-config-sync-xk`（不带路径，多机通用）；`dsh-pentest-gate` 之类同样用 `link:` 的插件有同一问题 |
 | 设置页保存时返回 401 / 请求被拒 | 旧版本守卫在桌面端也会调用宿主鉴权；新版已改为桌面端跳过（桌面代理自己负责鉴权），重启宿主后生效 |
 | 改了代码但行为没变 | 宿主内 ESM 模块已缓存，热重组只重挂 fiber；**重启 DeepSeek Harness** 才会加载新的 `lib/` 代码 |
 
 ## 开发
 
 ```powershell
-npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（133 个用例）
+npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（138 个用例）
 node scripts/install.mjs --dry-run
 npm run update:check      # 有没有上游新版本
 ```

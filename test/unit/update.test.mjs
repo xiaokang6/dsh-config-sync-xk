@@ -11,12 +11,14 @@ import path from 'node:path'
 import test from 'node:test'
 
 import {
+  LEGACY_PACKAGE_NAME,
   PACKAGE_NAME,
   applyUpdate,
   checkForUpdate,
   lockedCommit,
   parseRefsAdvertisement,
   parseSpec,
+  readDependency,
   readSpec,
   remoteCommit,
   resolveRemoteCommit,
@@ -36,7 +38,7 @@ function makeProfile({ spec, pinned, linkDir = null }) {
   if (pinned !== undefined) {
     fs.writeFileSync(
       path.join(dir, 'pnpm-lock.yaml'),
-      `lockfileVersion: '9.0'\n\npackages:\n\n  ${PACKAGE_NAME}@https://codeload.github.com/xiaokang6/dsh-config-sync/tar.gz/${pinned}:\n    resolution: {gitHosted: true}\n`,
+      `lockfileVersion: '9.0'\n\npackages:\n\n  ${PACKAGE_NAME}@https://codeload.github.com/xiaokang6/dsh-config-sync-xk/tar.gz/${pinned}:\n    resolution: {gitHosted: true}\n`,
     )
   }
   if (linkDir !== null) {
@@ -63,29 +65,29 @@ test('parseSpec recognises every install form', () => {
   assert.equal(parseSpec('link:D:/AI/chajian/dsh-config-sync').form, 'link')
   assert.equal(parseSpec('link:D:/AI/chajian/dsh-config-sync').dir, 'D:/AI/chajian/dsh-config-sync')
 
-  const short = parseSpec('github:xiaokang6/dsh-config-sync')
+  const short = parseSpec('github:xiaokang6/dsh-config-sync-xk')
   assert.deepEqual({ form: short.form, owner: short.owner, repo: short.repo, ref: short.ref }, {
     form: 'git',
     owner: 'xiaokang6',
-    repo: 'dsh-config-sync',
+    repo: 'dsh-config-sync-xk',
     ref: 'main',
   })
 
-  const pinned = parseSpec('github:xiaokang6/dsh-config-sync#dev')
+  const pinned = parseSpec('github:xiaokang6/dsh-config-sync-xk#dev')
   assert.equal(pinned.ref, 'dev')
 
-  const url = parseSpec('git+https://github.com/xiaokang6/dsh-config-sync.git')
+  const url = parseSpec('git+https://github.com/xiaokang6/dsh-config-sync-xk.git')
   assert.equal(url.form, 'git')
-  assert.equal(url.repo, 'dsh-config-sync')
+  assert.equal(url.repo, 'dsh-config-sync-xk')
 
   assert.equal(parseSpec('^0.1.0').form, 'registry')
   assert.equal(parseSpec('').form, 'registry')
 })
 
 test('readSpec and lockedCommit read the profile manifest and lockfile', () => {
-  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync', pinned: OLD })
-  assert.equal(readSpec(dir), 'github:xiaokang6/dsh-config-sync')
-  assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync'), OLD)
+  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync-xk', pinned: OLD })
+  assert.equal(readSpec(dir), 'github:xiaokang6/dsh-config-sync-xk')
+  assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync-xk'), OLD)
   assert.equal(lockedCommit(dir, 'someone', 'else'), undefined)
   assert.equal(readSpec(fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-update-empty-'))), undefined)
 })
@@ -119,8 +121,8 @@ function advertisement(sha, refs = ['refs/heads/main']) {
 }
 
 test('remoteCommit prefers the ls-remote head and passes a pinned sha through', async () => {
-  const remote = { owner: 'xiaokang6', repo: 'dsh-config-sync', ref: 'main' }
-  const { run } = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync refs/heads/main': `${NEW}\trefs/heads/main` })
+  const remote = { owner: 'xiaokang6', repo: 'dsh-config-sync-xk', ref: 'main' }
+  const { run } = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync-xk refs/heads/main': `${NEW}\trefs/heads/main` })
   assert.equal(await remoteCommit(remote, { cwd: os.tmpdir(), run, fetch: offlineFetch.fetchText }), NEW)
   assert.equal(await remoteCommit({ ...remote, ref: OLD }, { cwd: os.tmpdir(), run }), OLD)
   const offline = fakeGit({})
@@ -128,7 +130,7 @@ test('remoteCommit prefers the ls-remote head and passes a pinned sha through', 
 })
 
 test('a github install compares the pinned commit with the published head', async () => {
-  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync', pinned: OLD })
+  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync-xk', pinned: OLD })
 
   const current = await checkForUpdate({
     profileDir: dir,
@@ -158,7 +160,7 @@ test('a github install compares the pinned commit with the published head', asyn
 })
 
 test('an unreadable pin is unknown, not "an update is waiting"', async () => {
-  const dir = makeProfile({ spec: 'git+https://github.com/xiaokang6/dsh-config-sync.git' })
+  const dir = makeProfile({ spec: 'git+https://github.com/xiaokang6/dsh-config-sync-xk.git' })
   const check = await checkForUpdate({
     profileDir: dir,
     fetch: fakeFetch({ '/info/refs': { ok: true, status: 200, body: advertisement(NEW), contentType: 'application/x-git-upload-pack-advertisement' } }).fetchText,
@@ -179,13 +181,13 @@ test('lockedCommit reads the git+https lock form too', () => {
       '',
       '  .:',
       '    dependencies:',
-      '      dsh-config-sync:',
-      '        specifier: git+https://github.com/xiaokang6/dsh-config-sync.git',
-      `        version: git+https://github.com/xiaokang6/dsh-config-sync.git#${NEW}`,
+      '      @xiaokang6/dsh-config-sync:',
+      '        specifier: git+https://github.com/xiaokang6/dsh-config-sync-xk.git',
+      `        version: git+https://github.com/xiaokang6/dsh-config-sync-xk.git#${NEW}`,
       '',
     ].join('\n'),
   )
-  assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync'), NEW)
+  assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync-xk'), NEW)
 })
 
 test('the ref advertisement is validated before it is believed', () => {
@@ -199,7 +201,7 @@ test('the ref advertisement is validated before it is believed', () => {
 })
 
 test('the ref lookup falls back from info/refs to the API and then to git', async () => {
-  const remote = { owner: 'xiaokang6', repo: 'dsh-config-sync', ref: 'main' }
+  const remote = { owner: 'xiaokang6', repo: 'dsh-config-sync-xk', ref: 'main' }
 
   const viaApi = fakeFetch({
     '/info/refs': { ok: false, status: 403, body: '', contentType: '', error: 'HTTP 403' },
@@ -210,7 +212,7 @@ test('the ref lookup falls back from info/refs to the API and then to git', asyn
   assert.equal(apiResult.sha, NEW)
   assert.deepEqual(viaApi.calls.map((url) => (url.includes('/info/refs') ? 'refs' : 'api')), ['refs', 'api'])
 
-  const viaGit = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync refs/heads/main': `${OLD}\trefs/heads/main` })
+  const viaGit = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync-xk refs/heads/main': `${OLD}\trefs/heads/main` })
   const gitResult = await resolveRemoteCommit(remote, { cwd: os.tmpdir(), run: viaGit.run, fetch: offlineFetch.fetchText })
   assert.equal(gitResult.via, 'git')
   assert.equal(gitResult.sha, OLD)
@@ -248,13 +250,13 @@ test('a link install reports the checkout state and refuses a dirty worktree', a
 })
 
 test('applying to a github install reports the pin moving and asks for a reload', async () => {
-  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync', pinned: OLD })
+  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync-xk', pinned: OLD })
   let asked = null
   const fakeUpdate = async (input) => {
     asked = input
     fs.writeFileSync(
       path.join(dir, 'pnpm-lock.yaml'),
-      `lockfileVersion: '9.0'\n\npackages:\n\n  ${PACKAGE_NAME}@https://codeload.github.com/xiaokang6/dsh-config-sync/tar.gz/${NEW}:\n    resolution: {gitHosted: true}\n`,
+      `lockfileVersion: '9.0'\n\npackages:\n\n  ${PACKAGE_NAME}@https://codeload.github.com/xiaokang6/dsh-config-sync-xk/tar.gz/${NEW}:\n    resolution: {gitHosted: true}\n`,
     )
     return { ran: true, ok: true, outputTail: 'Done', policyRelaxed: false }
   }
@@ -267,7 +269,7 @@ test('applying to a github install reports the pin moving and asks for a reload'
 })
 
 test('a failed pnpm update keeps the failure readable and does not ask for a reload', async () => {
-  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync', pinned: OLD })
+  const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync-xk', pinned: OLD })
   const result = await applyUpdate({
     profileDir: dir,
     update: async () => ({ ran: true, ok: false, outputTail: 'ERR_PNPM_FETCH_404  GET https://codeload.github.com/…' }),
@@ -306,4 +308,48 @@ test('a profile that does not depend on the plugin is refused', async () => {
   const applied = await applyUpdate({ profileDir: dir })
   assert.equal(applied.ok, false)
   assert.match(applied.detail, new RegExp(PACKAGE_NAME, 'u'))
+})
+
+test('a profile installed under the pre-scope name still upgrades', async () => {
+  // The dependency key is whatever the profile holds, not what the package is
+  // called today: `pnpm update` matches by key, so passing the new name to an
+  // old profile would fail with "no such dependency" and strand that machine.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-update-legacy-'))
+  fs.writeFileSync(
+    path.join(dir, 'package.json'),
+    `${JSON.stringify({ name: 'p', private: true, dependencies: { [LEGACY_PACKAGE_NAME]: 'github:xiaokang6/dsh-config-sync-xk' } }, null, 2)}\n`,
+  )
+  assert.deepEqual(readDependency(dir), { name: LEGACY_PACKAGE_NAME, spec: 'github:xiaokang6/dsh-config-sync-xk' })
+  assert.equal(readSpec(dir), 'github:xiaokang6/dsh-config-sync-xk')
+
+  let asked = null
+  const result = await applyUpdate({
+    profileDir: dir,
+    update: async (input) => {
+      asked = input
+      return { ran: true, ok: true, outputTail: 'Done' }
+    },
+  })
+  assert.equal(asked.packageName, LEGACY_PACKAGE_NAME, 'pnpm must be given the key the profile actually has')
+  assert.equal(result.ok, true)
+})
+
+test('the current name wins when a profile carries both keys', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-update-both-'))
+  fs.writeFileSync(
+    path.join(dir, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: 'p',
+        private: true,
+        dependencies: {
+          [LEGACY_PACKAGE_NAME]: 'github:xiaokang6/dsh-config-sync-xk',
+          [PACKAGE_NAME]: 'github:xiaokang6/dsh-config-sync-xk',
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  assert.deepEqual(readDependency(dir), { name: PACKAGE_NAME, spec: 'github:xiaokang6/dsh-config-sync-xk' })
 })

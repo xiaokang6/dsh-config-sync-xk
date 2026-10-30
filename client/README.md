@@ -1,6 +1,6 @@
 # `client/` — settings-page UI
 
-Hand-written browser half of `dsh-config-sync`. No build step, no JSX, no
+Hand-written browser half of `@xiaokang6/dsh-config-sync`. No build step, no JSX, no
 dependencies beyond the `react` the shell seeds into the module table.
 
 ## Format
@@ -8,7 +8,7 @@ dependencies beyond the `react` the shell seeds into the module table.
 `client/client.js` is a lazy-CJS module in the shell's module format:
 
 ```js
-window.__ModuleLoader__.load({ id: 'dsh-config-sync', factory: (require) => { … } })
+window.__ModuleLoader__.load({ id: '@xiaokang6/dsh-config-sync', factory: (require) => { … } })
 ```
 
 The factory requires only `react`, builds its exports object from scratch
@@ -17,7 +17,7 @@ The factory requires only `react`, builds its exports object from scratch
 
 | export | meaning |
 | --- | --- |
-| `name` | `dsh-config-sync` |
+| `name` | `@xiaokang6/dsh-config-sync` (must equal the package name: the shell keys its module table by it) |
 | `inject` | `['slots', 'locale']` — the services the panel needs |
 | `apply(ctx)` | registers the dictionaries and the two slot contributions |
 | `dictionaries` | `{ zh, en }`, exposed for tooling only |
@@ -49,7 +49,7 @@ with the report it built, and that report is still rendered.
 
 ## Styling
 
-One inline `<style>` (`data-plugin-css="dsh-config-sync/panel.css"`), class
+One inline `<style>` (`data-plugin-css="@xiaokang6/dsh-config-sync/panel.css"`), class
 prefix `dcs-`. Colours come from the `--dsw-alias-*` theme variables with
 neutral fallbacks, so the panel follows the light/dark theme without hard-coded
 backgrounds. Secrets are never read back: fields show `已保存，留空保持不变`

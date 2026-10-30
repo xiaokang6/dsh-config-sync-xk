@@ -93,7 +93,7 @@ Tests may add `apiUrl` (github) / `timeoutMs` (both).
 
 - Base `settings.apiUrl ?? 'https://api.github.com'`; headers:
   `authorization: Bearer <token>`, `accept: application/vnd.github+json`,
-  `x-github-api-version: 2022-11-28`, `user-agent: dsh-config-sync/0.1.0`.
+  `x-github-api-version: 2022-11-28`, `user-agent: @xiaokang6/dsh-config-sync/0.1.0`.
 - `probe()`: `GET /repos/{owner}/{repo}` → 200 ok; 401/403 auth error; 404 error.
 - `read(path)`: `GET /repos/{owner}/{repo}/contents/{path}?ref={branch}`;
   file answer has `content` (base64), `sha`, `size`; 404 → `{found:false}`.
