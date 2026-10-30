@@ -42,14 +42,35 @@ pnpm install
 ### 其他机器：`github:` 快照（不需要克隆，也不依赖路径）
 
 ```powershell
+# 推荐：宿主自带的插件管理，会同时把 dsh-config-sync 加进 dsh.profile.bundles
+dsh plugin --profile desktop add github:xiaokang6/dsh-config-sync
+
+# 没有 dsh 命令时用 pnpm —— 但必须自己把 bundle 行补上，否则插件不会挂载
 cd $env:USERPROFILE\.dsh\profiles\desktop
 pnpm add github:xiaokang6/dsh-config-sync
-# 等价：dsh plugin --profile desktop add github:xiaokang6/dsh-config-sync
+# 然后把 "dsh-config-sync" 加进 package.json 的 dsh.profile.bundles
 ```
 
 多机同步时**推荐这个写法**：`link:` 写的是本机绝对路径，会跟着 `package.json` 一起同步到别的
 机器，路径不同那台就装不起来；`github:` 只有仓库名，任何机器都成立，`@deepseek-ai/*` peer
 依赖也能从 profile 正常解析（不需要额外链接）。装完重启 App 或点刷新按钮。
+
+**换新机器的顺序**（插件没法把自己装到一台空机器上，所以先装再同步）：
+
+1. 装**同一版本**的 DSH（profile 的 bundles 里有 `@deepseek-ai/dsh-experimental-*` 这类随发行版
+   附带的层，DSH 版本不同会解析不到，开机就会失败）；
+2. 用上面那条命令装插件（`dsh plugin … add`），重启 App；
+3. 打开 **设置 → 内置插件 → 配置同步**，填同一个远端 + 同一个口令；
+4. 「双向同步」——新机器没有合并基线，会自动采用远端配置，本机旧版本另存为 `.local-*` 备份；
+   拉到 `package.json` / `pnpm-lock.yaml` 变化时插件会自己跑 `pnpm install`。
+
+有三样东西**不会**跟着同步，每台机器各自准备：
+
+| 不同步的 | 为什么 |
+| --- | --- |
+| `~/.dsh/config-sync/remote.json`（WebDAV/GitHub 凭据、加密口令） | 本机机密，写进同步文件等于泄露 |
+| `~/.dsh/.credentials.yaml`、`.env` | 同上；`cordis.patch.yml` 里的 `{{SECRET_…}}` 占位符要在新机器的凭据库里能解析，否则那个 MCP/模型条目会失效 |
+| `node_modules/`、会话、附件 | 由 `pnpm install` 重建 / 本来就不该同步 |
 
 装好后打开 **设置 → 内置插件 → 配置同步**。
 
