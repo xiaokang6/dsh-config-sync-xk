@@ -85,6 +85,18 @@ pnpm add github:xiaokang6/dsh-config-sync
 - **一键升级**：`github:` 安装在 profile 里跑 `pnpm update dsh-config-sync`，`link:` 安装对那份
   检出做 fast-forward（有未提交改动会拒绝、不动你的工作区）；做完提示你点刷新按钮。
 
+「检查更新」的取数顺序和插件市场同一套思路——**先走 HTTPS，最后才碰 `git`**：
+
+1. `https://github.com/<owner>/<repo>/info/refs?service=git-upload-pack`（`git ls-remote` 读的
+   就是这份 advertisement，没有 API 限流），先校验 `# service=git-upload-pack` 与 40 位 ref 行；
+2. 失败再退到 `https://api.github.com/repos/<owner>/<repo>/commits/<ref>`；
+3. 都不行才 `git ls-remote`（需要 PATH 里有 git、且 git 自己的 `http.proxy` 配好）。
+
+所以宿主 PATH 里没有 git、或 git 没配代理，都不影响检查。走代理时用 undici 的
+`EnvHttpProxyAgent`（Node 全局 `fetch` 不读 `HTTP_PROXY`/`HTTPS_PROXY`），代理变量写进
+`~/.dsh/.env` 即可生效。另外**读不到 pin 不当成「有新版本」**：锁文件里的提交解析不出来时面板
+只说「未知」，详情里带上每一条失败原因（`info/refs: …; api: …; git: …`），不会瞎报。
+
 两种情况都以「重载宿主」收尾：点一下窗口右上角的刷新按钮（或重启 App），宿主里缓存的 ESM
 模块才会换掉——这条没法自动化，插件自己也重启不了宿主。
 
@@ -190,7 +202,7 @@ pnpm update dsh-config-sync
 ## 开发
 
 ```powershell
-npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（129 个用例）
+npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（133 个用例）
 node scripts/install.mjs --dry-run
 npm run update:check      # 有没有上游新版本
 ```

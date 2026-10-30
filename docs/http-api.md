@@ -165,17 +165,26 @@ decides the form, so the panel need not know how the user installed it:
     "canApply": true,
     "pinned": "aeeb63c",            // commit in pnpm-lock.yaml (git form)
     "latest": "49b444a",            // refs/heads/<ref> on GitHub
-    "upToDate": false,              // absent when the ref could not be read
+    "upToDate": false,              // absent when either side could not be read
+    "via": "refs",                  // "refs" | "api" | "git" | "pinned"
     "detail": "a newer commit is published; press 一键升级"
   }
 }
 ```
 
+The ref lookup is HTTPS first — GitHub's smart-HTTP advertisement
+(`/info/refs?service=git-upload-pack`, validated for its service prelude and a
+40-hex ref line before it is believed), then the REST API, then the `git` binary —
+so a host without git on `PATH`, or with git's own proxy unconfigured, still gets
+an answer. When `HTTP(S)_PROXY` is set the request goes through undici's
+`EnvHttpProxyAgent`, because Node's global `fetch` ignores those variables.
+`upToDate` is omitted rather than guessed: an unreadable pin and an unreachable
+ref are both "unknown", and `detail` carries every attempt's failure — never a
+false "already up to date" and never a false "update waiting".
+
 A `link:` install answers `behind` (commits behind its upstream) and `dirty`
 (uncommitted tracked edits) instead; `canApply` is false when the worktree is
-dirty, because a web route must not move someone's work aside. `upToDate` is
-omitted rather than guessed when GitHub is unreachable — an unchecked
-installation must not read as current.
+dirty, because a web route must not move someone's work aside.
 
 ### `POST /dsh-config-sync/update`
 

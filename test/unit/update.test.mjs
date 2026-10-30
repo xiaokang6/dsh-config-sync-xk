@@ -15,9 +15,11 @@ import {
   applyUpdate,
   checkForUpdate,
   lockedCommit,
+  parseRefsAdvertisement,
   parseSpec,
   readSpec,
   remoteCommit,
+  resolveRemoteCommit,
   sameCommit,
 } from '../../lib/sync/update.js'
 
@@ -95,33 +97,128 @@ test('sameCommit tolerates abbreviated ids', () => {
   assert.equal(sameCommit(undefined, NEW), false)
 })
 
+/** A `fetchText` stub: `routes` maps a URL substring to a canned answer. */
+function fakeFetch(routes) {
+  const calls = []
+  const fetchText = async (url) => {
+    calls.push(url)
+    const key = Object.keys(routes).find((needle) => url.includes(needle))
+    if (key === undefined) return { ok: false, status: 0, body: '', contentType: '', error: `no route for ${url}` }
+    const answer = routes[key]
+    return typeof answer === 'function' ? answer(url) : answer
+  }
+  return { fetchText, calls }
+}
+
+/** Offline stub: the HTTPS routes fail, so only the git route can answer. */
+const offlineFetch = { fetchText: async () => ({ ok: false, status: 0, body: '', contentType: '', error: 'offline' }) }
+
+/** A GitHub smart-HTTP ref advertisement carrying `sha`. */
+function advertisement(sha, refs = ['refs/heads/main']) {
+  return ['001e# service=git-upload-pack', '', ...refs.map((ref) => `003f${sha} ${ref}`)].join('\n')
+}
+
 test('remoteCommit prefers the ls-remote head and passes a pinned sha through', async () => {
   const remote = { owner: 'xiaokang6', repo: 'dsh-config-sync', ref: 'main' }
   const { run } = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync refs/heads/main': `${NEW}\trefs/heads/main` })
-  assert.equal(await remoteCommit(remote, { cwd: os.tmpdir(), run }), NEW)
+  assert.equal(await remoteCommit(remote, { cwd: os.tmpdir(), run, fetch: offlineFetch.fetchText }), NEW)
   assert.equal(await remoteCommit({ ...remote, ref: OLD }, { cwd: os.tmpdir(), run }), OLD)
   const offline = fakeGit({})
-  assert.equal(await remoteCommit(remote, { cwd: os.tmpdir(), run: offline.run }), undefined)
+  assert.equal(await remoteCommit(remote, { cwd: os.tmpdir(), run: offline.run, fetch: offlineFetch.fetchText }), undefined)
 })
 
 test('a github install compares the pinned commit with the published head', async () => {
   const dir = makeProfile({ spec: 'github:xiaokang6/dsh-config-sync', pinned: OLD })
-  const upToDate = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync refs/heads/main': `${OLD}\trefs/heads/main` })
-  const current = await checkForUpdate({ profileDir: dir, run: upToDate.run })
+
+  const current = await checkForUpdate({
+    profileDir: dir,
+    fetch: fakeFetch({ '/info/refs': { ok: true, status: 200, body: advertisement(OLD), contentType: 'application/x-git-upload-pack-advertisement' } }).fetchText,
+    run: fakeGit({}).run,
+  })
   assert.equal(current.form, 'git')
   assert.equal(current.upToDate, true)
   assert.equal(current.canApply, true)
   assert.equal(current.pinned, OLD.slice(0, 7))
   assert.equal(current.latest, OLD.slice(0, 7))
+  assert.equal(current.via, 'refs', 'the ref lookup happens over HTTPS, not through git')
 
-  const behind = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync refs/heads/main': `${NEW}\trefs/heads/main` })
-  const stale = await checkForUpdate({ profileDir: dir, run: behind.run })
+  const stale = await checkForUpdate({
+    profileDir: dir,
+    fetch: fakeFetch({ '/info/refs': { ok: true, status: 200, body: advertisement(NEW), contentType: 'application/x-git-upload-pack-advertisement' } }).fetchText,
+    run: fakeGit({}).run,
+  })
   assert.equal(stale.upToDate, false)
   assert.match(stale.detail, /newer commit/u)
 
-  const offline = await checkForUpdate({ profileDir: dir, run: fakeGit({}).run })
-  assert.equal(offline.upToDate, undefined, 'an unchecked ref must not claim to be current')
-  assert.equal(offline.canApply, true, 'an offline check still allows trying')
+  const unreachable = await checkForUpdate({ profileDir: dir, fetch: offlineFetch.fetchText, run: fakeGit({}).run })
+  assert.equal(unreachable.upToDate, undefined, 'an unchecked ref must not claim to be current')
+  assert.equal(unreachable.canApply, true, 'an offline check still allows trying')
+  assert.match(unreachable.detail, /could not read the ref on GitHub/u)
+  assert.match(unreachable.detail, /offline/u, 'the detail carries each attempt, not just "unreachable"')
+})
+
+test('an unreadable pin is unknown, not "an update is waiting"', async () => {
+  const dir = makeProfile({ spec: 'git+https://github.com/xiaokang6/dsh-config-sync.git' })
+  const check = await checkForUpdate({
+    profileDir: dir,
+    fetch: fakeFetch({ '/info/refs': { ok: true, status: 200, body: advertisement(NEW), contentType: 'application/x-git-upload-pack-advertisement' } }).fetchText,
+    run: fakeGit({}).run,
+  })
+  assert.equal(check.upToDate, undefined)
+  assert.match(check.detail, /pinned commit could not be read/u)
+})
+
+test('lockedCommit reads the git+https lock form too', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-update-lock-'))
+  fs.writeFileSync(
+    path.join(dir, 'pnpm-lock.yaml'),
+    [
+      "lockfileVersion: '9.0'",
+      '',
+      'importers:',
+      '',
+      '  .:',
+      '    dependencies:',
+      '      dsh-config-sync:',
+      '        specifier: git+https://github.com/xiaokang6/dsh-config-sync.git',
+      `        version: git+https://github.com/xiaokang6/dsh-config-sync.git#${NEW}`,
+      '',
+    ].join('\n'),
+  )
+  assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync'), NEW)
+})
+
+test('the ref advertisement is validated before it is believed', () => {
+  assert.equal(parseRefsAdvertisement(advertisement(OLD), 'main'), OLD)
+  assert.equal(parseRefsAdvertisement(advertisement(OLD, ['refs/tags/v1', 'refs/heads/dev']), 'dev'), OLD)
+  assert.equal(parseRefsAdvertisement(advertisement(OLD, ['refs/tags/v1']), 'v1'), OLD)
+  assert.equal(parseRefsAdvertisement(`${OLD} HEAD\n${advertisement(OLD)}`, undefined), OLD)
+  assert.equal(parseRefsAdvertisement('<html>this mirror is offline</html>', 'main'), undefined)
+  assert.equal(parseRefsAdvertisement('', 'main'), undefined)
+  assert.equal(parseRefsAdvertisement(advertisement(OLD, ['refs/heads/other']), 'main'), undefined)
+})
+
+test('the ref lookup falls back from info/refs to the API and then to git', async () => {
+  const remote = { owner: 'xiaokang6', repo: 'dsh-config-sync', ref: 'main' }
+
+  const viaApi = fakeFetch({
+    '/info/refs': { ok: false, status: 403, body: '', contentType: '', error: 'HTTP 403' },
+    '/commits/main': { ok: true, status: 200, body: JSON.stringify({ sha: NEW }), contentType: 'application/json' },
+  })
+  const apiResult = await resolveRemoteCommit(remote, { cwd: os.tmpdir(), run: fakeGit({}).run, fetch: viaApi.fetchText })
+  assert.equal(apiResult.via, 'api')
+  assert.equal(apiResult.sha, NEW)
+  assert.deepEqual(viaApi.calls.map((url) => (url.includes('/info/refs') ? 'refs' : 'api')), ['refs', 'api'])
+
+  const viaGit = fakeGit({ 'ls-remote https://github.com/xiaokang6/dsh-config-sync refs/heads/main': `${OLD}\trefs/heads/main` })
+  const gitResult = await resolveRemoteCommit(remote, { cwd: os.tmpdir(), run: viaGit.run, fetch: offlineFetch.fetchText })
+  assert.equal(gitResult.via, 'git')
+  assert.equal(gitResult.sha, OLD)
+  assert.equal(gitResult.errors.length, 2, 'both HTTPS failures are reported')
+
+  const nothing = await resolveRemoteCommit(remote, { cwd: os.tmpdir(), run: fakeGit({}).run, fetch: offlineFetch.fetchText })
+  assert.equal(nothing.sha, undefined)
+  assert.equal(nothing.errors.length, 3)
 })
 
 test('a link install reports the checkout state and refuses a dirty worktree', async () => {
