@@ -202,7 +202,7 @@ pnpm update @xiaokang6/dsh-config-sync
 ## 开发
 
 ```powershell
-npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（138 个用例）
+npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（139 个用例）
 node scripts/install.mjs --dry-run
 npm run update:check      # 有没有上游新版本
 ```

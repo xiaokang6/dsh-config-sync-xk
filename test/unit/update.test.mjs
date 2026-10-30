@@ -353,3 +353,32 @@ test('the current name wins when a profile carries both keys', async () => {
   )
   assert.deepEqual(readDependency(dir), { name: PACKAGE_NAME, spec: 'github:xiaokang6/dsh-config-sync-xk' })
 })
+
+test('the upgrade script reads the pin exactly as the panel does', () => {
+  // `scripts/update.mjs` used to carry its own copy of this reader, and that copy
+  // knew only the `codeload…/tar.gz/<sha>` shape. A profile installed with
+  // `dsh plugin … add github:…` pins `git+https://…#<sha>` instead, so the script
+  // reported "an update is available" for a profile that was exactly current —
+  // while the panel, reading through this module, correctly said "up to date".
+  // The script now imports this function; this test holds that wiring in place
+  // by running it and by comparing its answer with the module's for every lock
+  // shape pnpm writes.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-update-script-'))
+  const lockShapes = [
+    `  ${PACKAGE_NAME}@https://codeload.github.com/xiaokang6/dsh-config-sync-xk/tar.gz/${NEW}:\n    resolution: {gitHosted: true}\n`,
+    `  ${PACKAGE_NAME}@git+https://github.com/xiaokang6/dsh-config-sync-xk.git#${NEW}:\n    resolution: {commit: ${NEW}, repo: https://github.com/xiaokang6/dsh-config-sync-xk.git, type: git}\n`,
+    `  ${PACKAGE_NAME}@https://github.com/xiaokang6/dsh-config-sync-xk.git#${NEW}:\n    resolution: {commit: ${NEW}, type: git}\n`,
+  ]
+  const scriptText = fs.readFileSync(new URL('../../scripts/update.mjs', import.meta.url), 'utf8')
+  assert.match(
+    scriptText,
+    /lockedCommit as lockedCommitIn/u,
+    'the script must import the shared reader instead of keeping a second copy',
+  )
+  for (const shape of lockShapes) {
+    fs.writeFileSync(path.join(dir, 'pnpm-lock.yaml'), `lockfileVersion: '9.0'\n\npackages:\n\n${shape}`)
+    assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync-xk'), NEW, `lock shape not read: ${shape.trim()}`)
+  }
+  fs.writeFileSync(path.join(dir, 'pnpm-lock.yaml'), "lockfileVersion: '9.0'\n\npackages:\n\n")
+  assert.equal(lockedCommit(dir, 'xiaokang6', 'dsh-config-sync-xk'), undefined, 'an unpinned lockfile has no pin')
+})

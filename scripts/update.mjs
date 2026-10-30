@@ -36,12 +36,18 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
-/** The package this script upgrades. */
-const PACKAGE_NAME = '@xiaokang6/dsh-config-sync'
-/** Its name before the scope move; old profiles still key the dependency by it. */
-const LEGACY_PACKAGE_NAME = 'dsh-config-sync'
-/** Dependency keys this plugin answers to, current name first. */
-const PACKAGE_NAMES = [PACKAGE_NAME, LEGACY_PACKAGE_NAME]
+// The identity of the package and the lockfile reader come from the plugin's own
+// module, not from copies kept here: the panel's upgrade card and this script
+// answer the same question ("what is pinned in this profile?"), so a profile the
+// panel calls up to date must never be called "an update is available" here.
+// `lib/sync/update.js` imports nothing outside `node:` builtins, so a checkout
+// with no `node_modules` can still run this script.
+import {
+  LEGACY_PACKAGE_NAME,
+  PACKAGE_NAME,
+  PACKAGE_NAMES,
+  lockedCommit as lockedCommitIn,
+} from '../lib/sync/update.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoDir = path.resolve(here, '..')
@@ -134,13 +140,23 @@ function gitRemoteOf(spec) {
   return undefined
 }
 
-/** Commit the profile's lockfile pinned for `owner/repo`, or undefined. */
+/**
+ * Commit the profile's lockfile pinned for `owner/repo`, or undefined.
+ *
+ * This reads the same lockfile the panel's upgrade card reads, through the same
+ * function, so the two can never disagree: a profile that the panel calls "up to
+ * date" must not be called "an update is available" here. pnpm writes a git
+ * install in more than one shape (`codeload…/tar.gz/<sha>` for the `github:`
+ * shortcut, `git+https://…#<sha>` for a direct git URL — which is what
+ * `dsh plugin … add github:…` leaves behind), and the shared implementation
+ * matches every one of them.
+ *
+ * @param {string} owner
+ * @param {string} repo
+ * @returns {string | undefined}
+ */
 function lockedCommit(owner, repo) {
-  const lockPath = path.join(profileDir, 'pnpm-lock.yaml')
-  if (!fs.existsSync(lockPath)) return undefined
-  const text = fs.readFileSync(lockPath, 'utf8')
-  const pattern = new RegExp(`codeload\\.github\\.com/${owner}/${repo}/tar\\.gz/([0-9a-f]{7,40})`, 'u')
-  return pattern.exec(text)?.[1]
+  return lockedCommitIn(profileDir, owner, repo)
 }
 
 /** Current commit of the spec's ref on GitHub, or undefined when offline. */
