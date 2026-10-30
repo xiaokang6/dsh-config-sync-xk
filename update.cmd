@@ -1,7 +1,11 @@
 @echo off
-rem dsh-config-sync 一键升级。
-rem 脚本读 profile 里这个插件的安装形态：link: 就拉仓库，github: 就 pnpm update。
-rem 结束后回到 DeepSeek Harness，点窗口右上角的刷新按钮（或重启 App）才生效。
+rem One-click upgrade for dsh-config-sync, whichever way it was installed.
+rem The script reads the profile's dependency spec: link: pulls this checkout,
+rem github: runs "pnpm update" in the profile.
+rem Afterwards press the refresh button at the top right of DeepSeek Harness
+rem (or restart the app) so the host drops its cached modules.
+rem Keep this file ASCII-only: cmd.exe parses a batch file with the codepage that
+rem was active when it started, so UTF-8 text here turns into broken commands.
 chcp 65001 >nul
 cd /d "%~dp0"
 node scripts\update.mjs %*
