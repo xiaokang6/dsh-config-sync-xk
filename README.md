@@ -22,6 +22,8 @@
 
 ## 安装
 
+### 开发机：`link:` 到本仓库（改代码即生效）
+
 ```powershell
 cd D:\AI\chajian\dsh-config-sync
 
@@ -34,26 +36,49 @@ pnpm install
 
 # 3) 让宿主重新加载插件
 #    - 重启 DeepSeek Harness，或
-#    - 给 cordis.patch.yml 加一行注释触发 loader 热重组（推荐，见 docs/design.md）
+#    - 点窗口右上角的刷新按钮换掉宿主侧插件代码
 ```
+
+### 其他机器：`github:` 快照（不需要克隆，也不依赖路径）
+
+```powershell
+cd $env:USERPROFILE\.dsh\profiles\desktop
+pnpm add github:xiaokang6/dsh-config-sync
+# 等价：dsh plugin --profile desktop add github:xiaokang6/dsh-config-sync
+```
+
+多机同步时**推荐这个写法**：`link:` 写的是本机绝对路径，会跟着 `package.json` 一起同步到别的
+机器，路径不同那台就装不起来；`github:` 只有仓库名，任何机器都成立，`@deepseek-ai/*` peer
+依赖也能从 profile 正常解析（不需要额外链接）。装完重启 App 或点刷新按钮。
 
 装好后打开 **设置 → 内置插件 → 配置同步**。
 
 ## 更新
 
+一条命令，两种安装形态都认（脚本读 profile 里 `dsh-config-sync` 的依赖写法自行判断）：
+
 ```powershell
 cd D:\AI\chajian\dsh-config-sync
 npm run update          # 等价于双击仓库根目录的 update.cmd
+npm run update:check    # 只看有没有新版本，什么都不改
 ```
 
-一条命令做完四件事：
+- **`link:` 安装**：`git fetch` + fast-forward 本仓库（本地未提交改动先 stash、更新后还原），
+  只有 `package.json` / `pnpm-lock.yaml` 变了才在 profile 里跑 `pnpm install`（优先用宿主自带的
+  pnpm），并补上 `link:` 导入需要的 `@deepseek-ai/*` peer 链接——插件是按真实路径被导入的，
+  宿主包不在那条解析路径上。
+- **`github:` 安装**：在 profile 里执行 `pnpm update dsh-config-sync` 重新解析 ref（`pnpm-lock.yaml`
+  里 pin 的提交会跟着前进），不需要克隆、不需要记住路径。
 
-1. `git fetch` + fast-forward 到上游（本地未提交改动先 stash，更新完再还原，不会丢）；
-2. 只有 `package.json` / `pnpm-lock.yaml` 变了，才在 profile 里跑 `pnpm install`（优先用宿主自带的 pnpm）；
-3. 补上 `link:` 导入需要的 `@deepseek-ai/*` peer 链接（插件按真实路径被导入，宿主包不在解析路径上）；
-4. 提示你点一次刷新按钮（或重启 App）——宿主里已缓存的 ESM 模块只有重载才会换掉。
+两种都以「重载宿主」收尾：点一下刷新按钮（或重启 App），宿主里缓存的 ESM 模块才会换掉。
 
-只想看有没有新版本、什么都不改：`npm run update:check`。
+没有克隆的机器想升级，可以直接在 profile 里跑：
+
+```powershell
+cd $env:USERPROFILE\.dsh\profiles\desktop
+pnpm update dsh-config-sync
+```
+
 
 ## 配置远端
 
@@ -129,6 +154,7 @@ npm run update          # 等价于双击仓库根目录的 update.cmd
 | 拉取被拒（零依赖） | 确认远端 `package.json` 是否来自坏备份；必要时在设置里临时允许空依赖，或先修远端 |
 | 冲突文件堆积 | 在设置页逐个「采用远端 / 采用本地」，处理后会删除 `.remote-*` 副本 |
 | 上传已有文件报 412 `ETag doesn't match` | 坚果云返回的 ETag 不带引号、且按字符串原文比较 `If-Match`；旧版给它补了 RFC 的引号，于是每个已存在的文件都写不进去。新版原样透传（`lib/sync/remotes/webdav.js` 的 `ifMatchValue`），更新后重启即好 |
+| 同步到另一台机器后插件不见了 / `pnpm install` 报链接目标不存在 | `package.json` 里是 `link:D:/…` 这种本机绝对路径，跟着配置同步过去就失效。改用 `github:xiaokang6/dsh-config-sync`（不带路径，多机通用）；`dsh-pentest-gate` 之类同样用 `link:` 的插件有同一问题 |
 | 设置页保存时返回 401 / 请求被拒 | 旧版本守卫在桌面端也会调用宿主鉴权；新版已改为桌面端跳过（桌面代理自己负责鉴权），重启宿主后生效 |
 | 改了代码但行为没变 | 宿主内 ESM 模块已缓存，热重组只重挂 fiber；**重启 DeepSeek Harness** 才会加载新的 `lib/` 代码 |
 
