@@ -40,7 +40,9 @@
   },
   "scripts": {
     "test": "node --test \"test/**/*.test.mjs\"",
-    "install:desktop": "node scripts/install.mjs"
+    "install:desktop": "node scripts/install.mjs",
+    "update": "node scripts/update.mjs",
+    "update:check": "node scripts/update.mjs --check"
   },
   "keywords": [
     "dsh",

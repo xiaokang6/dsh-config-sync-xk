@@ -39,6 +39,22 @@ pnpm install
 
 装好后打开 **设置 → 内置插件 → 配置同步**。
 
+## 更新
+
+```powershell
+cd D:\AI\chajian\dsh-config-sync
+npm run update          # 等价于双击仓库根目录的 update.cmd
+```
+
+一条命令做完四件事：
+
+1. `git fetch` + fast-forward 到上游（本地未提交改动先 stash，更新完再还原，不会丢）；
+2. 只有 `package.json` / `pnpm-lock.yaml` 变了，才在 profile 里跑 `pnpm install`（优先用宿主自带的 pnpm）；
+3. 补上 `link:` 导入需要的 `@deepseek-ai/*` peer 链接（插件按真实路径被导入，宿主包不在解析路径上）；
+4. 提示你点一次刷新按钮（或重启 App）——宿主里已缓存的 ESM 模块只有重载才会换掉。
+
+只想看有没有新版本、什么都不改：`npm run update:check`。
+
 ## 配置远端
 
 ### 坚果云 WebDAV（推荐）
@@ -112,14 +128,16 @@ pnpm install
 | 远端数据已加密但本机没口令 | 打开加密并录入相同口令，再同步 |
 | 拉取被拒（零依赖） | 确认远端 `package.json` 是否来自坏备份；必要时在设置里临时允许空依赖，或先修远端 |
 | 冲突文件堆积 | 在设置页逐个「采用远端 / 采用本地」，处理后会删除 `.remote-*` 副本 |
+| 上传已有文件报 412 `ETag doesn't match` | 坚果云返回的 ETag 不带引号、且按字符串原文比较 `If-Match`；旧版给它补了 RFC 的引号，于是每个已存在的文件都写不进去。新版原样透传（`lib/sync/remotes/webdav.js` 的 `ifMatchValue`），更新后重启即好 |
 | 设置页保存时返回 401 / 请求被拒 | 旧版本守卫在桌面端也会调用宿主鉴权；新版已改为桌面端跳过（桌面代理自己负责鉴权），重启宿主后生效 |
 | 改了代码但行为没变 | 宿主内 ESM 模块已缓存，热重组只重挂 fiber；**重启 DeepSeek Harness** 才会加载新的 `lib/` 代码 |
 
 ## 开发
 
 ```powershell
-npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（105 个用例）
+npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（115 个用例）
 node scripts/install.mjs --dry-run
+npm run update:check      # 有没有上游新版本
 ```
 
 改了 `lib/`、`client/` 或 `package.json` 后需要**重启宿主**再验证：DSH 的 loader 热重组只重挂插件 fiber，已经 import 过的 ESM 模块不会重新执行。
