@@ -151,6 +151,60 @@ answer with no report means nothing was changed (the backup is still listed).
 
 `text/plain; charset=utf-8` NDJSON export (redacted), capped at 2000 lines.
 
+### `GET /dsh-config-sync/update`
+
+Read-only look at this plugin's own installation. The profile's dependency spec
+decides the form, so the panel need not know how the user installed it:
+
+```json
+{
+  "ok": true,
+  "update": {
+    "form": "git",                  // "git" | "link" | "registry"
+    "spec": "github:xiaokang6/dsh-config-sync",
+    "canApply": true,
+    "pinned": "aeeb63c",            // commit in pnpm-lock.yaml (git form)
+    "latest": "49b444a",            // refs/heads/<ref> on GitHub
+    "upToDate": false,              // absent when the ref could not be read
+    "detail": "a newer commit is published; press 一键升级"
+  }
+}
+```
+
+A `link:` install answers `behind` (commits behind its upstream) and `dirty`
+(uncommitted tracked edits) instead; `canApply` is false when the worktree is
+dirty, because a web route must not move someone's work aside. `upToDate` is
+omitted rather than guessed when GitHub is unreachable — an unchecked
+installation must not read as current.
+
+### `POST /dsh-config-sync/update`
+
+Guarded (same-origin + host gate, like every mutating route). Upgrades the
+installed copy and reports what moved:
+
+- `git` form — `pnpm update dsh-config-sync` in the profile; the pin moving is
+  the proof, `restartRequired` follows it.
+- `link` form — `git merge --ff-only @{upstream}` in the checkout; refused with
+  `ran: false` when tracked edits are uncommitted.
+- no dependency / nothing to do — `ok: false` with HTTP 409 and a readable
+  `detail`.
+
+```json
+{
+  "ok": true,
+  "update": {
+    "ran": true, "ok": true, "form": "git",
+    "pinBefore": "aeeb63c", "pinAfter": "49b444a",
+    "restartRequired": true,
+    "outputTail": "…pnpm tail…",
+    "detail": "aeeb63c → 49b444a"
+  }
+}
+```
+
+Nothing here restarts the host: DSH keeps ESM modules in memory, so the panel
+says "reload" (header refresh button) instead of pretending the new code is live.
+
 ## Client expectations
 
 The settings page (`client/client.js`) is hand-written CJS, `require('react')`

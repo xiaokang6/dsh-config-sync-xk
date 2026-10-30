@@ -173,6 +173,23 @@ window.__ModuleLoader__.load({
       logsRefresh: '刷新',
       logsEmpty: '暂无日志。',
       syncDone: '同步完成。',
+      updateTitle: '插件升级',
+      updateIntro: '升级本机 profile 里的 dsh-config-sync 版本。完成后需要点窗口右上角的刷新按钮（或重启 App）才会用上新代码。',
+      updateCheck: '检查更新',
+      updateApply: '一键升级',
+      updateRunning: '升级中…',
+      updateInstall: '安装形态',
+      updatePinned: '当前锁定',
+      updateLatest: '远端最新',
+      updateUpToDate: '已是最新',
+      updateAvailable: '有新版本',
+      updateUnknown: '远端不可达（离线或代理）',
+      updateNever: '还没检查过，点「检查更新」看有没有新版本。',
+      updateDone: '升级完成',
+      updateCurrent: '已是最新，无需升级。',
+      updateReload: '请点窗口右上角的刷新按钮（或重启 App）让新代码生效。',
+      updateConfirm: '现在升级本机 profile 里的 dsh-config-sync？升级会改 package.json / pnpm-lock.yaml，并自动跑 pnpm。',
+      errUpdate: '升级失败',
     }
 
     const en = {
@@ -293,6 +310,23 @@ window.__ModuleLoader__.load({
       logsRefresh: 'Refresh',
       logsEmpty: 'No log entries.',
       syncDone: 'Sync finished.',
+      updateTitle: 'Upgrade plugin',
+      updateIntro: 'Upgrade the dsh-config-sync installed in this profile. The new code only takes effect after the refresh button at the top right (or a restart).',
+      updateCheck: 'Check for updates',
+      updateApply: 'Upgrade now',
+      updateRunning: 'Upgrading…',
+      updateInstall: 'Install form',
+      updatePinned: 'Pinned',
+      updateLatest: 'Published',
+      updateUpToDate: 'Up to date',
+      updateAvailable: 'Update available',
+      updateUnknown: 'Could not reach GitHub (offline or proxy)',
+      updateNever: 'Not checked yet — press "Check for updates".',
+      updateDone: 'Upgraded',
+      updateCurrent: 'Already up to date.',
+      updateReload: 'Press the refresh button at the top right (or restart the app) so the new code takes effect.',
+      updateConfirm: 'Upgrade the dsh-config-sync installed in this profile? This rewrites package.json / pnpm-lock.yaml and runs pnpm.',
+      errUpdate: 'Upgrade failed',
     }
 
     /**
@@ -586,6 +620,36 @@ window.__ModuleLoader__.load({
           files: Array.isArray(entry.files) ? entry.files.filter((file) => typeof file === 'string') : [],
           remoteKind: typeof entry.remoteKind === 'string' ? entry.remoteKind : '',
         }))
+    }
+
+    /**
+     * Normalise `GET /update` and `POST /update` answers.
+     * @param {any} payload - route answer.
+     * @returns {{form: string, spec: string, canApply: boolean, pinned: string, latest: string,
+     *   upToDate: boolean|null, detail: string, ran: boolean, ok: boolean, restartRequired: boolean,
+     *   pinBefore: string, pinAfter: string, outputTail: string}|null}
+     */
+    function readUpdate(payload) {
+      const source = payload !== null && typeof payload === 'object' && payload.update !== null && typeof payload.update === 'object'
+        ? payload.update
+        : null
+      if (source === null) return null
+      const text = (value) => (typeof value === 'string' ? value : '')
+      return {
+        form: text(source.form),
+        spec: text(source.spec),
+        canApply: source.canApply === true,
+        pinned: text(source.pinned),
+        latest: text(source.latest),
+        upToDate: typeof source.upToDate === 'boolean' ? source.upToDate : null,
+        detail: text(source.detail),
+        ran: source.ran === true,
+        ok: source.ok !== false,
+        restartRequired: source.restartRequired === true,
+        pinBefore: text(source.pinBefore),
+        pinAfter: text(source.pinAfter),
+        outputTail: text(source.outputTail),
+      }
     }
 
     /** Render one report/list entry that may be a string or a small object. */
@@ -1087,6 +1151,58 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /** Plugin self-upgrade: check the pin, then one button that applies it. */
+    function UpdateCard({ info, busy, t, onCheck, onApply }) {
+      const disabled = busy !== ''
+      const running = busy === 'update'
+      const chip = info === null
+        ? null
+        : info.upToDate === true
+          ? h('span', { className: 'dcs-chip dcs-chip-ok' }, t('updateUpToDate'))
+          : info.upToDate === false
+            ? h('span', { className: 'dcs-chip dcs-chip-warn' }, t('updateAvailable'))
+            : h('span', { className: 'dcs-chip' }, t('updateUnknown'))
+      const lines = []
+      if (info !== null && info.spec !== '') {
+        lines.push(h('p', { className: 'dcs-hint', key: 'spec' },
+          `${t('updateInstall')}: `,
+          h('span', { className: 'dcs-mono' }, info.spec)))
+      }
+      const pinLine = info === null
+        ? ''
+        : [
+          info.pinned === '' ? '' : `${t('updatePinned')} ${info.pinned}`,
+          info.latest === '' ? '' : `${t('updateLatest')} ${info.latest}`,
+        ].filter((part) => part !== '').join(' · ')
+      if (pinLine !== '') lines.push(h('p', { className: 'dcs-hint', key: 'pin' }, pinLine))
+      if (info !== null && info.detail !== '') lines.push(h('p', { className: 'dcs-hint', key: 'detail' }, info.detail))
+      return h('section', { className: 'dcs-card' },
+        h('div', { className: 'dcs-card-head' },
+          h('h3', { className: 'dcs-card-title' }, t('updateTitle')),
+          running ? h('span', { className: 'dcs-chip dcs-chip-warn' }, t('updateRunning')) : chip,
+        ),
+        h('p', { className: 'dcs-hint' }, t('updateIntro')),
+        h('div', { className: 'dcs-actions' },
+          h('button', {
+            key: 'check',
+            className: 'dcs-btn',
+            type: 'button',
+            disabled,
+            onClick: onCheck,
+          }, t('updateCheck')),
+          h('button', {
+            key: 'apply',
+            className: 'dcs-btn dcs-btn-primary',
+            type: 'button',
+            disabled: disabled || (info !== null && info.canApply !== true),
+            onClick: onApply,
+          }, t('updateApply')),
+        ),
+        info === null ? h('p', { className: 'dcs-hint' }, t('updateNever')) : null,
+        ...lines,
+      )
+    }
+
     /** Conflict rows: keep the remote copy or the local one, per file. */
     function ConflictsCard({ conflicts, busy, t, onResolve }) {
       const rows = conflicts.map((entry) => {
@@ -1176,6 +1292,7 @@ window.__ModuleLoader__.load({
       const [report, setReport] = React.useState(null)
       const [logs, setLogs] = React.useState(null)
       const [logsOpen, setLogsOpen] = React.useState(false)
+      const [updateInfo, setUpdateInfo] = React.useState(null)
       const [busy, setBusy] = React.useState('')
       const [loading, setLoading] = React.useState(true)
       const [msg, setMsg] = React.useState(null)
@@ -1335,6 +1452,28 @@ window.__ModuleLoader__.load({
         })
       }, [run])
 
+      /** Look only: GET /update fetches/ls-remotes at most, it writes nothing. */
+      const checkUpdate = React.useCallback(() => {
+        void run('update-check', 'errUpdate', async () => {
+          setUpdateInfo(readUpdate(await request('/update')))
+        })
+      }, [run])
+
+      /** The one-click upgrade: POST /update runs pnpm update in this profile. */
+      const applyUpdateNow = React.useCallback(() => {
+        const confirmed = typeof window !== 'undefined' && typeof window.confirm === 'function'
+          ? window.confirm(t('updateConfirm'))
+          : false
+        if (confirmed !== true) return
+        void run('update', 'errUpdate', async () => {
+          const outcome = readUpdate(await request('/update', { method: 'POST', body: {} }))
+          setUpdateInfo(outcome)
+          const reloadHint = outcome !== null && outcome.restartRequired ? ` · ${t('updateReload')}` : ` · ${t('updateCurrent')}`
+          setMsg({ ok: true, text: `${t('updateDone')}${reloadHint}` })
+          await refreshStatus()
+        })
+      }, [run, t, refreshStatus])
+
       const toggleLogs = () => {
         const next = !logsOpen
         setLogsOpen(next)
@@ -1390,6 +1529,14 @@ window.__ModuleLoader__.load({
         t,
         onCheck: check,
         onSync: sync,
+      }))
+      children.push(h(UpdateCard, {
+        key: 'update',
+        info: updateInfo,
+        busy,
+        t,
+        onCheck: checkUpdate,
+        onApply: applyUpdateNow,
       }))
       if (conflicts.length > 0) {
         children.push(h(ConflictsCard, {

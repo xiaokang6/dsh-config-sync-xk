@@ -76,7 +76,19 @@ pnpm add github:xiaokang6/dsh-config-sync
 
 ## 更新
 
-一条命令，两种安装形态都认（脚本读 profile 里 `dsh-config-sync` 的依赖写法自行判断）：
+### 面板里点两下（任何机器都行，不需要克隆）
+
+**设置 → 内置插件 → 配置同步 → 「插件升级」卡片**：
+
+- **检查更新**：读 profile 里的依赖写法（`github:` / `link:` / registry），把锁文件里的提交与
+  GitHub 上的分支头比一下，直接告你「已是最新」还是「有新版本」；
+- **一键升级**：`github:` 安装在 profile 里跑 `pnpm update dsh-config-sync`，`link:` 安装对那份
+  检出做 fast-forward（有未提交改动会拒绝、不动你的工作区）；做完提示你点刷新按钮。
+
+两种情况都以「重载宿主」收尾：点一下窗口右上角的刷新按钮（或重启 App），宿主里缓存的 ESM
+模块才会换掉——这条没法自动化，插件自己也重启不了宿主。
+
+### 命令行 / 双击
 
 ```powershell
 cd D:\AI\chajian\dsh-config-sync
@@ -84,16 +96,11 @@ npm run update          # 等价于双击仓库根目录的 update.cmd
 npm run update:check    # 只看有没有新版本，什么都不改
 ```
 
-- **`link:` 安装**：`git fetch` + fast-forward 本仓库（本地未提交改动先 stash、更新后还原），
-  只有 `package.json` / `pnpm-lock.yaml` 变了才在 profile 里跑 `pnpm install`（优先用宿主自带的
-  pnpm），并补上 `link:` 导入需要的 `@deepseek-ai/*` peer 链接——插件是按真实路径被导入的，
-  宿主包不在那条解析路径上。
-- **`github:` 安装**：在 profile 里执行 `pnpm update dsh-config-sync` 重新解析 ref（`pnpm-lock.yaml`
-  里 pin 的提交会跟着前进），不需要克隆、不需要记住路径。
+脚本与面板按钮走同一套判断：`link:` 就拉本仓库（本地未提交改动先 stash、更新后还原，只有
+`package.json` / `pnpm-lock.yaml` 变了才跑 `pnpm install`，并补上 `link:` 导入需要的
+`@deepseek-ai/*` peer 链接）；`github:` 就 `pnpm update dsh-config-sync` 并报告新 pin。
 
-两种都以「重载宿主」收尾：点一下刷新按钮（或重启 App），宿主里缓存的 ESM 模块才会换掉。
-
-没有克隆的机器想升级，可以直接在 profile 里跑：
+没有克隆的机器想从命令行升级，直接在 profile 里跑：
 
 ```powershell
 cd $env:USERPROFILE\.dsh\profiles\desktop
@@ -183,7 +190,7 @@ pnpm update dsh-config-sync
 ## 开发
 
 ```powershell
-npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（115 个用例）
+npm test                  # node --test：单元 + 适配器 mock + engine↔adapter 集成测试（129 个用例）
 node scripts/install.mjs --dry-run
 npm run update:check      # 有没有上游新版本
 ```
